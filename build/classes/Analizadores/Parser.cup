@@ -1,0 +1,724 @@
+/*----------------------------------------------------------------------------
+--------------------- 1ra. Area: Codigo de Usuario
+----------------------------------------------------------------------------*/
+
+//-------> Importaciones 
+
+package Analizadores;
+
+import java_cup.runtime.Symbol;
+import java.util.LinkedList;
+import Internal.*;
+import java.util.Dictionary;
+import java.util.Hashtable;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
+
+//-------> Codigo para el parser, variables, metodos
+
+parser code
+{:  
+    private  LinkedList<Token> errores = new LinkedList<Token>();
+    private String resultado, consola = "", nativeHtml = "";
+    private Dictionary<String,Object> variables = new Hashtable();; 
+    private Dictionary<String,Struct> Estructuras = new Hashtable();; 
+    
+    public String getResultado(){
+        return resultado;
+    }
+    
+    public String getConsola(){
+        return consola;
+    }
+    
+
+    public  LinkedList<Token> getErrores() {
+        return errores;
+    }
+
+    public  Dictionary<String,Object> getVariables() {
+        return variables;
+    }
+  
+    String getHTML(String id){
+        String response = "";
+        Struct var = Estructuras.get(id);
+        switch(var.getType()){
+            case "imagen":
+                response = "<img src = " + var.getPath();
+                if(var.getWidth() != null) response = response + " height = "+var.getHeight()+" width = "+var.getWidth();
+                response = response + " >\n";
+                break;
+            case "parrafo":
+                response = "<p" ;
+                if(var.getAlign() != null){
+                    switch(var.getAlign().replace("\"","").toLowerCase()){
+                        case "izquierda":
+                            response = response + " align = \"left\"";
+                            break;
+                        case "derecha":
+                            response = response + " align = \"right\"";
+                            break;
+                        case "centrado":
+                            response = response + " align = \"center\"";
+                            break;
+                        case "justificado":
+                            response = response + " align = \"justify\"";
+                            break;
+                    }
+                }
+                response = response + " >\n" + var.getContent() + "\n</p>\n";
+                break;
+            case "textoa":
+                response = "<font size=\"+2\">"+var.getContent()+"</font>\n";
+                break;
+            case "textob":
+                response = "<font size=\"+1\">"+var.getContent()+"</font>\n";
+                break;
+            case "boton":
+                response ="<button "; 
+                if(var.getContent() != null) response = response + " onclick = Click() ";
+                response = response + "id= \""+var.getId()+"\" type=\"button\">"+var.getText()+"</button>\n";
+                if(var.getContent() != null) response = response + "<script> function Click(){ alert("+ var.getContent()+"); } </script>\n";
+                break;
+            case "table":    
+                response = "<table border = \" ";
+                if(var.getBord() != null){
+                    if(Boolean.getBoolean(var.getBord())) response = response + 1;
+                    else response = response + 0;
+                }
+                response = response + " \" >  " + var.getContent();
+                response = response + "\n</table>\n";
+                break;
+        }
+        return response;
+    }
+
+    private String nativeBuild(String a, String c){
+        String b[] = c.split(",");
+        String RESULT = "";
+            Struct nuevo;
+            switch(b[0]){
+                case "align":
+                    Estructuras.get(a).setAlign(b[1]);
+                    break;
+                case "bord":
+                    Estructuras.get(a).setBord(b[1]);
+                    break;
+                case "text":
+                    Estructuras.get(a).setText(c.substring(c.indexOf(',') + 2,c.length() - 1));
+                    break;
+                case "contenido":
+                    Estructuras.get(a).setContent(c.substring(c.indexOf(',') + 2,c.length() - 1));
+                    break;
+                case "path":
+                    Estructuras.get(a).setPath(b[1]);
+                    break;
+                case "height":
+                    Estructuras.get(a).setHeight(b[1]);
+                    break;
+                case "width":
+                    Estructuras.get(a).setWidth(b[1]);
+                    break;
+                case "click":
+                    Estructuras.get(a).setContent(b[1]);
+                    break;
+                case "insert":
+                    RESULT = getHTML(a);
+                    break;
+                case "imagen":
+                    nuevo = new Struct();
+                    nuevo.setType("imagen");
+                    nuevo.setPath(b[1]);
+                    if(b.length > 2){
+                        nuevo.setHeight(b[2]);
+                        nuevo.setWidth(b[3]);
+                    }
+                    Estructuras.put(a,nuevo);
+                    break;
+                case "parrafo":
+                    nuevo = new Struct();
+                    nuevo.setType("parrafo");
+                    
+                    if(b.length > 2){
+                        nuevo.setAlign(b[b.length - 1]);
+                        c.replace(b[b.length - 1] , "");
+                    }
+                    nuevo.setContent(c.substring(c.indexOf(',') + 2,c.length() - 1));
+                    Estructuras.put(a,nuevo);
+                    break;
+                case "textoa":
+                    nuevo = new Struct();
+                    nuevo.setType("textoa");
+                    nuevo.setContent(c.substring(c.indexOf(',') + 2,c.length() - 1));
+                    Estructuras.put(a,nuevo);
+                    break;
+                case "textob":
+                    nuevo = new Struct();
+                    nuevo.setType("textob");
+                    nuevo.setContent(c.substring(c.indexOf(',') + 2,c.length() - 1));
+                    Estructuras.put(a,nuevo);
+                    break;
+                case "boton":
+                    nuevo = new Struct();
+                    nuevo.setType("boton");
+                    nuevo.setId(b[1]);
+                    nuevo.setText(b[2]);
+                    Estructuras.put(a,nuevo);
+                    break;
+                case "table":
+                    nuevo = new Struct();
+                    nuevo.setType("table");
+                    nuevo.setContent(b[1]);
+                    Estructuras.put(a,nuevo);
+                    break;
+            }
+           return RESULT; 
+    }
+
+    private String getFrom(String b, String a){
+        String RESULT = "";
+        switch(a){
+                    case "align":
+                        RESULT = Estructuras.get(b).getAlign();
+                        break;
+                    case "text":
+                        RESULT = Estructuras.get(b).getText();
+                        break;
+                    case "contenido":
+                        RESULT = Estructuras.get(b).getContent();
+                        break;
+                    case "path":
+                        RESULT = Estructuras.get(b).getPath();
+                        break;
+                    case "altura":
+                        RESULT = Estructuras.get(b).getHeight();
+                        break;
+                    case "ancho":
+                        RESULT = Estructuras.get(b).getWidth();
+                        break;
+        }
+        return RESULT;
+    }
+
+    private void performAction(String sentence){
+        String[] flag = sentence.split("\\|");
+
+        switch(flag[0]){
+            case "build":
+            nativeHtml = nativeHtml + nativeBuild(flag[1],flag[2]);
+            break;
+            case "print":
+            consola = consola +"\n"+ flag[1].replace("\"",""); 
+            break;
+            case "put":
+            variables.put(flag[0],flag[1]);
+            break;
+        }
+    }
+
+    //Metodo al que se llama automaticamente ante algun error sintactico
+    public void syntax_error(Symbol s)
+    {        
+        String lexema = s.value.toString();
+        int fila = s.right;
+        int columna = s.left;
+        
+        System.out.println("!!!!!!! Error Sintactico Recuperado !!!!!!!");
+        System.out.println("\t\tLexema: "+lexema);
+        System.out.println("\t\tFila: "+fila);
+        System.out.println("\t\tColumna: "+columna);
+       
+        Token error = new Token(fila, columna, lexema, "Error Sintactico", "Simbolo no esperado");
+        errores.add(error);
+            
+    }
+
+    //Metodo al que se llama en el momento en que ya no es posible una recuperacion de errores
+    public void unrecovered_syntax_error(Symbol s) throws java.lang.Exception
+    {        
+        String lexema = s.value.toString();
+        int fila = s.right;
+        int columna = s.left;
+        
+        System.out.println("!!!!!!! Error Sintactico, Panic Mode !!!!!!! ");
+        System.out.println("\t\tLexema: "+lexema);
+        System.out.println("\t\tFila: "+fila);
+        System.out.println("\t\tColumna: "+columna);
+
+        Token error = new Token(fila, columna, lexema, "Error Sintactico", "Error Fatal");
+        errores.add(error);
+    }
+:}
+
+//-------> Acciones Gramaticales
+action code
+{:
+
+:}
+
+/*----------------------------------------------------------------------------
+--------------------- 2da. Area: Declaraciones
+----------------------------------------------------------------------------*/
+
+//-------> Simbolos
+terminal slash, lessThan, greaterThan, closeQuestion, openPar, closePar, openCB, closeCB, openB, closeB;
+terminal dollar, plus, minus, by, and, or, semicolon, equal, UMINUS, hashtag, point, comma, closeAdm,any;
+terminal equalequal,lessequal,greaterequal,notequal;
+
+//-------> Reservadas del sistema
+terminal String compi, cabecera, cuerpo, fondo, alineacion, borde, alto, ancho, titulo;
+terminal String texto, path, fila, columna, columnac, identificador; 
+terminal String parrafo, salto, tabla, imagen, textoa, textob, boton, espacio; 
+
+terminal sScript, iff, elsse, echo, repeat, makeImg ,makePar,makeText1 ,makeText2 ,makeTable ,makeButton;
+terminal setText, setCont, setAl, setPath, setB, setHeight, setWidth, insert, click; //* Terminales para los SETS del SCRIPT
+terminal getText, getCont, getAl, getPath, getHeight, getWidth; //* Terminales para los GETS del SCRIPT
+
+//-------> Expresiones Regulares
+terminal String number, cadena, bool, id;
+
+//-------> Declaracion de no Terminales
+non terminal String START, CBODY, TITLE, MAINBODY, BATRIB, PATRIB, TABATRIB, IMGATRIB, TBODY, FBODY, CCBODY, MAINBODY2;
+non terminal String SCRIPTBODY, SCRIPTTYPE,COND,THEN, NATIVE, NATIVE2, STRINGS, BOOL, PRINT, IMGARGS, CUERPO, CABECERA,SCRIPTBODY2;
+non terminal String ARGSPAR, TABBODY, SLIST, TABBODY2, COMP, LOG, CCBODY2, PRINT2, VARIABLE, IMGATRIB2;
+non terminal String PARGETS, PARSETS, TABSETS, IMGGETS, IMGSETS, BUTTONGETS, BUTTONSETS, E, SETS, GETS, ANY;
+
+//-------> Precedencia
+precedence left or;
+precedence left and;
+precedence left closeAdm;
+precedence left greaterThan, lessThan, equal,equalequal,lessequal,greaterequal,notequal;
+precedence left plus, minus;
+precedence left by, slash;
+precedence left UMINUS;
+
+start with START;
+
+
+/*-------------------------------------------------------------------
+--------------------- 3ra. y ultima area: Reglas Sintacticas
+-------------------------------------------------------------------*/
+START::= lessThan compi greaterThan ANY CBODY:a lessThan slash compi greaterThan ANY {: 
+    RESULT = " <!DOCTYPE html> \n" +
+    " <html> \n" + a + " \n </html>";
+    resultado = RESULT;
+:}
+;
+
+CBODY::= CUERPO:a CABECERA:b {:RESULT= b + " \n " + a;:}
+        |CABECERA:a CUERPO:b {:RESULT= a + " \n " + b;:}
+;
+
+CUERPO::=lessThan cuerpo BATRIB:b greaterThan ANY MAINBODY:a lessThan slash cuerpo greaterThan ANY {:RESULT = "<body " + b + "> \n " + a + " \n </body>";:}
+;
+
+CABECERA::= lessThan cabecera greaterThan ANY TITLE:a lessThan slash cabecera greaterThan ANY {:RESULT = " <head> \n " + a + " \n </head>";:}
+;
+
+TITLE::= lessThan titulo greaterThan ANY:a lessThan slash titulo greaterThan ANY {:RESULT = "<title>" + a + "</title>";:}
+;
+
+BATRIB::= fondo equal cadena:a {:
+    String res = "style= \"background-color: ";
+    switch(a){
+        case "azul":
+            res += "blue; \" ";
+        break;
+        case "rojo":
+            res += "red; \" ";
+        break;
+        case "amarillo":
+            res += "yellow; \" ";
+        break;
+        case "verde":
+            res += "green; \" ";
+        break;
+        case "gris":
+            res += "gray; \" ";
+        break;
+        case "negro":
+            res += "black; \" ";
+        break;
+        case "rosado":
+            res += "pink; \" ";
+        break;
+        default:
+            res += a + "; \" ";
+        break;
+    }
+    RESULT = res;
+    :}
+;
+
+MAINBODY::= MAINBODY:a lessThan MAINBODY2:b greaterThan ANY {:
+        if(a!= null)RESULT = a + "\n <" + b + ">";
+        else RESULT = "\n <" + b + ">";
+:}
+        |
+;
+
+MAINBODY2::=  parrafo PATRIB:a greaterThan ANY:b lessThan slash parrafo{:RESULT = "p " + a + " > " + b + " </p";:}
+        |  slash salto {: RESULT = "br"; :}
+        |  tabla TABATRIB:a greaterThan ANY TBODY:b lessThan slash tabla {:RESULT = "table " + a + "> " + b + "</table";:}
+        |  imagen IMGATRIB:a greaterThan ANY lessThan slash imagen{: RESULT = "img " + a; :}
+        |  textoa greaterThan ANY:a  lessThan slash textoa {:RESULT = "font size=\"+4\">" + a +"</font";:}
+        |  textob greaterThan  ANY:a  lessThan slash textob {:RESULT = "font size=\"+2\">" + a +"</font";:}
+        |  boton identificador equal cadena:a texto equal cadena:b greaterThan ANY lessThan slash boton {:RESULT="button id ="+ a +" type= \" button \" >"+ b + "</button";:}
+        |  espacio greaterThan ANY MAINBODY:a lessThan slash espacio {:RESULT = "div> " + a + "\n</div";:}
+        |  sScript SCRIPTBODY:a closeQuestion {:
+           
+            String[] instructions = a.split("%");
+            for(String sentence : instructions){
+                performAction(sentence);
+            }
+
+            //nativeHtml me guarda os inserts() que se hicieron durante la ejecucion del script
+            //Luego se limpia para cuando lo use otro Script
+            RESULT = nativeHtml.substring(1, nativeHtml.length()-2);
+            nativeHtml = "";
+        :}
+;
+
+PATRIB::= alineacion equal cadena:a {:
+    String res = "align = \" ";
+    switch(a.replace("\"","")){
+        case "izquierda":
+            res += "left \" ";
+        break;
+        case "derecha":
+            res += "right \" ";
+        break;
+        case "centrado":
+            res += "center \" ";
+        break;
+        case "justificado":
+            res += "justify \" ";
+        break;
+        default:
+            res = "";
+        break;
+    }
+    RESULT = res;
+:}
+        | {: RESULT = "";:}
+;
+
+TABATRIB::= borde equal bool:a {:
+    if(a.equals("true")){
+        RESULT = "border = \" 1 \" ";
+    }else if(a.equals("false")){
+        RESULT = "border = \" 0 \" ";
+    }else{
+        RESULT = "";
+    }
+:}
+;
+
+TBODY::= TBODY:a lessThan fila greaterThan ANY FBODY:b lessThan slash fila greaterThan ANY {:
+        if(a!= null)RESULT =  a + "\n<tr>" + b + "\n</tr>\n";
+        else RESULT ="\n<tr>" + b + "\n</tr>\n";
+    :}
+        |
+;
+
+FBODY::= FBODY:a lessThan columna greaterThan  CCBODY:b lessThan slash columna greaterThan ANY{:
+        if(a!=null)RESULT = a + " \n <td>" + b + "</td>";
+        else RESULT ="\n <td>" + b + "</td>";
+    :}
+        | FBODY:a lessThan columnac greaterThan  CCBODY:b lessThan slash columnac greaterThan ANY{:
+        if(a!=null)RESULT = a + " \n <th>" + b + "</th>";
+        else RESULT ="\n <th>" + b + "</th>";
+    :}
+        |
+;
+
+CCBODY::= CCBODY:a lessThan CCBODY2:b greaterThan ANY {:
+            if(a != null) RESULT = a + "<" + b + " >"; 
+            else RESULT = "<" + b + " >";
+        :}
+        | ANY:a {: 
+            if(a != null){
+                RESULT = a;
+            }
+        :}
+;
+
+CCBODY2::=  parrafo PATRIB:a greaterThan ANY:b  lessThan slash parrafo {:RESULT = "p " + a + " > " + b + " </p";:}
+        |  slash salto {: RESULT = "br"; :}
+        |  imagen IMGATRIB:a greaterThan ANY lessThan slash imagen{: RESULT = "img " + a; :}
+        |  boton identificador equal cadena:a texto equal cadena:b greaterThan ANY lessThan slash boton {:RESULT="button id = \" "+ a +" \" type= \" button \" >"+ b + "</button";:}
+        |  sScript SCRIPTBODY:a closeQuestion {:
+            String[] instructions = a.split("%");
+            for(String sentence : instructions){
+                performAction(sentence);
+            }
+
+            //nativeHtml me guarda os inserts() que se hicieron durante la ejecucion del script
+            //Luego se limpia para cuando lo use otro Script
+            RESULT = nativeHtml.substring(1, nativeHtml.length()-2);
+            nativeHtml = "";
+        :}
+;
+
+IMGATRIB::= IMGATRIB2:b path equal cadena:a {: RESULT = "src = " + a + " " + b; :}
+;
+
+IMGATRIB2::=  ancho equal E:b alto equal E:a{: RESULT = "height = " + a + " width = " + b; :}
+            | alto equal E:a ancho equal E:b{: RESULT = "height = " + a + " width = " + b; :}
+            | {: RESULT = "";:}
+;
+
+ANY::= any:a ANY:b {:
+    if(a != null && b != null){
+        RESULT =  a + b;
+    }
+    else if(a == null && b== null){} 
+    else if(a == null){
+        RESULT = b;
+    }
+    else if(b == null){
+        RESULT =(String) a;
+    }
+:}
+       |
+;
+
+
+//--------------------------------------EMPIEZA LENGUAJE SCRIPT----------------------------
+
+SCRIPTBODY::= SCRIPTBODY:a SCRIPTBODY2:b {:
+    if(a != null && b != null)RESULT = a + "%" + b;
+    else if(a == null) RESULT = b;
+    else if(b == null) RESULT = a;
+    else RESULT = "";
+:}
+            | SCRIPTBODY2:a {:
+            if(a != null) RESULT = a;
+            else RESULT = "";
+:}
+;
+
+SCRIPTBODY2::= VARIABLE:a equal SCRIPTTYPE:b semicolon {:
+            variables.put(a,b);
+            RESULT = "put|" + a + "|" + b;
+        :}
+        | echo PRINT:a {: 
+            RESULT = "print|" + a;
+        :}
+        | iff openPar COND:a closePar openCB SCRIPTBODY:b closeCB THEN:c{:
+
+            try{
+                if((boolean) new ScriptEngineManager().getEngineByExtension("js").eval(a)){
+                    RESULT = b;
+                }else RESULT = c;
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
+        :}
+        | repeat openPar E:a closePar openCB SCRIPTBODY:b closeCB {:
+            int iterations = Integer.parseInt((String)a);
+            String response = "";
+            for(int i = 1; i < iterations; i++){
+                response = response + "%" + b;
+            }
+            RESULT = response;
+        :}
+        | hashtag id:a NATIVE:c semicolon {:
+            nativeBuild(a,c);
+            RESULT = "build|" + a + "|" + c;
+        :}
+;
+
+
+SCRIPTTYPE::= E:a {:RESULT = a;:}
+            | bool:a {:RESULT = a;:}
+            | cadena:a {:RESULT = a;:}
+;
+
+NATIVE::= equal NATIVE2:a {:RESULT = a;:}
+        | point SETS:b {:RESULT = b;:}
+;
+
+NATIVE2::= makeImg openPar STRINGS:a IMGARGS:b closePar {:
+            RESULT = "imagen," + a + "," + b;
+        :}
+        | makePar openPar STRINGS:a ARGSPAR:b closePar {:
+            RESULT = "parrafo," + a + b;
+        :}
+        | makeText1 openPar STRINGS:a closePar {:
+            RESULT = "textoa," + a;
+        :}
+        | makeText2 openPar STRINGS:a closePar {:
+            RESULT = "textob," + a;
+        :}
+        | makeTable openPar TABBODY:a closePar{:
+            RESULT = "table," + a;
+        :} 
+        | makeButton openPar STRINGS:a comma STRINGS:b closePar{:
+            RESULT = "boton," + a + "," + b;
+        :} 
+;
+
+SETS::= PARSETS:a {:RESULT = a;:} 
+        | IMGSETS:a {:RESULT = a;:} 
+        | TABSETS:a {:RESULT = a;:} 
+        | BUTTONSETS:a {:RESULT = a;:} 
+        | insert openPar closePar {:RESULT = "insert";:} 
+;
+
+VARIABLE::= dollar id:a {: RESULT = a; :}
+; 
+
+PRINT::=  STRINGS:a PRINT2:b {: RESULT = a + b;
+:}
+; 
+
+PRINT2::= point PRINT:a {:RESULT = a;:}
+        | semicolon {:RESULT = "";:}
+;
+
+THEN::= elsse openCB SCRIPTBODY:a closeCB {:RESULT = a;:}
+        | {: RESULT = "";:}
+;
+
+COND::= COND:a LOG:c BOOL:b {:RESULT = a + " " + c + " " + b;:}
+        |BOOL:a {:RESULT = a;:}
+;
+
+LOG::= and and {:RESULT = "&&";:}
+    | or or {:RESULT = "||";:}
+;
+
+BOOL::= bool:a {:RESULT = a;:}
+         | E:a{:
+            RESULT = a;
+         :}
+;
+
+COMP::= lessThan:a {:RESULT = (String)a;:}
+        | greaterThan:a {:RESULT = (String)a;:}
+        | notequal:a {:RESULT = (String)a;:}
+        | equalequal:a {:RESULT = (String)a;:}
+        | greaterequal:a {:RESULT = (String)a;:}
+        | lessequal:a {:RESULT = (String)a;:}
+;
+
+STRINGS::= cadena:a {:RESULT = a;:}
+        | E:a {:RESULT = a;:}
+;
+
+GETS::= PARGETS:a {:RESULT = a;:}
+        | IMGGETS:a {:RESULT = a;:}
+        | BUTTONGETS:a {:RESULT = a;:}
+;
+
+BUTTONSETS::= setText openPar STRINGS:a closePar {:RESULT = "text,"+a;:}
+            | click openPar STRINGS:a closePar {:RESULT = "click,"+a;:}
+;
+
+BUTTONGETS::= getText openPar closePar{:RESULT = "text";:}
+;
+
+TABBODY::= openB SLIST:a closeB TABBODY2:b {:
+        String[] elements = a.split(",");
+        String response = "<tr>\n";
+        for(String flag : elements){
+            response = response + "<td>" + flag.replace("\"","") + "</td>\n";
+        }
+        response = response + "</tr>\n" + b;
+        RESULT = response;
+    :}
+;
+
+TABBODY2::= comma TABBODY:a {:RESULT = a;:}
+        | {: RESULT = "";:}
+;
+
+SLIST::= SLIST:a comma STRINGS:b {:RESULT = a + "," + b;:}
+          | STRINGS:a {:RESULT = a;:}  
+;
+
+TABSETS::= setB openPar BOOL:a closePar {:RESULT = "bord,"+a;:}
+;
+
+
+ARGSPAR::= comma STRINGS:a {: RESULT = "," + a;:}
+        | {: RESULT = "";:}
+;
+
+IMGARGS::= comma E:a comma E:b {:RESULT = a + "," + b;:}
+        | {:RESULT = "";:}
+;
+
+PARGETS::= getCont openPar closePar {:RESULT = "contenido";:} 
+        | getAl openPar closePar {:RESULT = "align";:}
+;
+
+PARSETS::= setCont openPar STRINGS:a closePar {:RESULT = "contenido,"+a;:}
+        | setAl openPar STRINGS:a closePar {:RESULT = "align,"+a;:}
+;
+
+IMGSETS::=setPath openPar STRINGS:a closePar {:RESULT = "path,"+a;:}
+        | setHeight openPar E:a closePar {:RESULT = "height,"+a;:}
+        | setWidth openPar E:a closePar {:RESULT = "width,"+a;:}
+;
+
+IMGGETS::=getPath openPar closePar {:RESULT = "path";:}
+        | getHeight openPar closePar {:RESULT = "altura";:}
+        | getWidth openPar closePar {:RESULT = "ancho";:}
+;
+
+
+E::= E:a plus E:b{:
+
+    Double val1 = Double.parseDouble((String)a);
+    Double val2 = Double.parseDouble((String)b);
+    Double res=val1+val2;
+    RESULT= (int) Math.round(res)+"";
+:}
+|E:a minus E:b{:
+    Double val1 = Double.parseDouble((String)a);
+    Double val2 = Double.parseDouble((String)b);
+    Double res=val1-val2;
+    RESULT= (int) Math.round(res)+"";
+:}
+|E:a by E:b{:
+    Double val1 = Double.parseDouble((String)a);
+    Double val2 = Double.parseDouble((String)b);
+    Double res=val1*val2;
+    RESULT= (int) Math.round(res)+"";
+:}
+|E:a slash E:b{:
+    Double val1 = Double.parseDouble((String)a);
+    Double val2 = Double.parseDouble((String)b);
+    Double res=val1/val2;
+    RESULT= (int) Math.round(res)+"";
+:}
+|E:a COMP:c E:b{:
+    RESULT= a + " " + c + " " + b;
+:}
+| closeAdm E{::}
+|number:a {:
+    RESULT = a;
+:}
+| VARIABLE:a {:
+    System.out.println("devolviendo el valorde " +a + " es " + variables.get(a));
+    RESULT = "" + variables.get(a);
+:}
+| hashtag id:b point GETS:a {:
+    //Busca el valor para un struct nativo del lenguaje
+    RESULT = getFrom(b,a);
+:}
+|openPar COND:a closePar
+{:
+    RESULT=a;
+:}
+| minus E:a {:
+    Double val1 = Double.parseDouble((String)a);
+    Double res= 0 - val1;
+    RESULT= (int) Math.round(res)+"";
+:} %prec UMINUS 
+;
+
